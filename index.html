@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Pro - 100 Palabras</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --correct: #4ade80;
+            --wrong: #f87171;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            width: 95%;
+            max-width: 700px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1.5rem;
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 12px;
+        }
+
+        .stat-value { font-size: 1.3rem; font-weight: bold; color: var(--accent); display: block; }
+        .stat-label { font-size: 0.65rem; text-transform: uppercase; opacity: 0.6; }
+
+        #word-display {
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            min-height: 120px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            overflow: hidden;
+            align-content: center;
+        }
+
+        .word { opacity: 0.3; transition: 0.2s; }
+        .current { opacity: 1; border-bottom: 2px solid var(--accent); color: var(--text); }
+        .correct { color: var(--correct); opacity: 1; }
+        .wrong { color: var(--wrong); opacity: 1; }
+
+        input {
+            width: 80%;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 1.2rem;
+            outline: none;
+            text-align: center;
+        }
+
+        #result-screen { display: none; padding: 20px; border-top: 1px solid #334155; }
+        .rank { font-size: 1.8rem; font-weight: 800; margin-bottom: 10px; }
+
+        .btn-restart {
+            background: var(--accent);
+            color: #0f172a;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="stats-bar">
+        <div><span class="stat-value" id="timer">0.0</span><span class="stat-label">Segundos</span></div>
+        <div><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
+        <div><span class="stat-value" id="accuracy">0%</span><span class="stat-label">Precisión</span></div>
+    </div>
+
+    <div id="word-display"></div>
+
+    <input type="text" id="input-field" placeholder="Escribe para empezar..." autocomplete="off">
+    
+    <div id="result-screen">
+        <div id="rank-text" class="rank">---</div>
+        <p id="time-taken">Tiempo: 0s</p>
+        <button class="btn-restart" onclick="initGame()">Reiniciar</button>
+    </div>
+</div>
+
+<script>
+    // Lista de 100 palabras balanceadas
+    const wordBank = [
+        "teclado", "raton", "monitor", "codigo", "fuente", "archivo", "carpeta", "sistema", "memoria", "nucleo",
+        "internet", "servidor", "cliente", "nube", "redes", "datos", "seguridad", "cifrado", "password", "usuario",
+        "web", "movil", "tablet", "consola", "juego", "graficos", "procesador", "placa", "disco", "pantalla",
+        "ventana", "icono", "herramienta", "ajustes", "perfil", "mensaje", "correo", "chat", "video", "audio",
+        "musica", "camara", "sensor", "bateria", "carga", "cable", "conexion", "señal", "wifi", "bluetooth",
+        "html", "css", "javascript", "python", "java", "ruby", "rust", "clase", "objeto", "metodo",
+        "variable", "constante", "booleano", "entero", "cadena", "arreglo", "lista", "pila", "cola", "arbol",
+        "algoritmo", "logica", "sintaxis", "error", "debug", "compilar", "ejecutar", "parche", "version", "update",
+        "interfaz", "diseño", "pixel", "vector", "estilo", "efecto", "animacion", "transicion", "evento", "click",
+        "tecla", "escritorio", "comando", "terminal", "consola", "shell", "script", "bot", "ia", "robot"
+    ];
+    
+    let words = [];
+    let currentWordIndex = 0;
+    let startTime = null;
+    let isPlaying = false;
+    let correctCount = 0;
+    let totalTyped = 0;
+    let animationId = null;
+
+    const wordDisplay = document.getElementById('word-display');
+    const inputField = document.getElementById('input-field');
+    const timerDisplay = document.getElementById('timer');
+    const resultScreen = document.getElementById('result-screen');
+    const rankText = document.getElementById('rank-text');
+
+    function initGame() {
+        cancelAnimationFrame(animationId);
+        // Mezcla y elige 15 palabras para la ronda
+        words = [...wordBank].sort(() => Math.random() - 0.5).slice(0, 15); 
+        currentWordIndex = 0;
+        correctCount = 0;
+        totalTyped = 0;
+        isPlaying = false;
+        startTime = null;
+        
+        inputField.value = "";
+        inputField.disabled = false;
+        inputField.style.display = "inline-block";
+        resultScreen.style.display = "none";
+        
+        timerDisplay.innerText = "0.0";
+        document.getElementById('wpm').innerText = "0";
+        document.getElementById('accuracy').innerText = "0%";
+        
+        renderWords();
+        inputField.focus();
+    }
+
+    function renderWords() {
+        wordDisplay.innerHTML = words.map((word, i) => `
+            <span class="word ${i === 0 ? 'current' : ''}" id="word-${i}">${word}</span>
+        `).join('');
+    }
+
+    inputField.addEventListener('input', () => {
+        if (!isPlaying && inputField.value.trim().length > 0) {
+            isPlaying = true;
+            startTime = Date.now();
+            updateTime();
+        }
+
+        const typedValue = inputField.value.trim();
+        const currentWord = words[currentWordIndex];
+
+        // Detectar espacio para pasar de palabra
+        if (inputField.value.endsWith(' ')) {
+            if (typedValue.length > 0) {
+                totalTyped++;
+                const wordElement = document.getElementById(`word-${currentWordIndex}`);
+                
+                if (typedValue === currentWord) {
+                    wordElement.classList.add('correct');
+                    correctCount++;
+                } else {
+                    wordElement.classList.add('wrong');
+                }
+
+                wordElement.classList.remove('current');
+                currentWordIndex++;
+
+                if (currentWordIndex >= words.length) {
+                    endGame();
+                } else {
+                    document.getElementById(`word-${currentWordIndex}`).classList.add('current');
+                }
+                
+                inputField.value = "";
+                updateStats();
+            } else {
+                inputField.value = ""; // Evitar espacios vacios al inicio
+            }
+        }
+    });
+
+    function updateTime() {
+        if (!isPlaying) return;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        timerDisplay.innerText = elapsed;
+        animationId = requestAnimationFrame(updateTime);
+    }
+
+    function updateStats() {
+        const accuracy = Math.round((correctCount / totalTyped) * 100) || 0;
+        document.getElementById('accuracy').innerText = accuracy + "%";
+        
+        const elapsedMin = (Date.now() - startTime) / 60000;
+        const wpm = Math.round(correctCount / (elapsedMin || 0.01));
+        document.getElementById('wpm').innerText = wpm;
+    }
+
+    function endGame() {
+        isPlaying = false;
+        cancelAnimationFrame(animationId);
+        const finalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        const wpm = document.getElementById('wpm').innerText;
+        
+        inputField.disabled = true;
+        inputField.style.display = "none";
+        resultScreen.style.display = "block";
+        
+        document.getElementById('time-taken').innerText = `Tardaste: ${finalTime} segundos`;
+        
+        let rank = "";
+        let color = "";
+
+        if (wpm >= 70) { rank = "¡LEYENDA! 🏆"; color = "#facc15"; }
+        else if (wpm >= 50) { rank = "VELOZ 🔥"; color = "#4ade80"; }
+        else if (wpm >= 30) { rank = "ESTÁNDAR 🆗"; color = "#38bdf8"; }
+        else { rank = "LENTO 🐌"; color = "#f87171"; }
+
+        rankText.innerText = rank;
+        rankText.style.color = color;
+    }
+
+    initGame();
+</script>
+
+</body>
+</html>
